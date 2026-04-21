@@ -1,15 +1,18 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import mysql.connector
+import os
 
 app = Flask(__name__)
 CORS(app)
 
+# ---------- DATABASE CONNECTION ----------
 db = mysql.connector.connect(
-    host="localhost",
-    user="root",
-    password="Shruti@3002",
-    database="parking_booking_system"
+    host=os.getenv("MYSQLHOST"),
+    user=os.getenv("MYSQLUSER"),
+    password=os.getenv("MYSQLPASSWORD"),
+    database=os.getenv("MYSQLDATABASE"),
+    port=int(os.getenv("MYSQLPORT", 3306))
 )
 
 cursor = db.cursor(dictionary=True)
@@ -25,7 +28,7 @@ pricing = {
 # ---------- HOME ----------
 @app.route("/")
 def home():
-    return jsonify({"message": "Backend Running"})
+    return jsonify({"message": "Backend Running Successfully"})
 
 
 # ---------- LOCATIONS ----------
@@ -39,7 +42,7 @@ def locations():
     return jsonify(cursor.fetchall())
 
 
-# ---------- BOOK SLOT AUTO ----------
+# ---------- BOOK SLOT ----------
 @app.route("/book", methods=["POST"])
 def book():
 
@@ -52,7 +55,7 @@ def book():
     location_id = int(data["location_id"])
     hours = int(data["hours"])
 
-    # Find matching free slot automatically
+    # Find available slot
     cursor.execute("""
         SELECT slot_id, slot_number
         FROM parking_slots
@@ -65,16 +68,14 @@ def book():
     slot = cursor.fetchone()
 
     if not slot:
-        return jsonify({
-            "message": "No Slot Available"
-        })
+        return jsonify({"message": "No Slot Available"})
 
     slot_id = slot["slot_id"]
     slot_number = slot["slot_number"]
 
     amount = pricing[location_id][vehicle_type] * hours
 
-    # create user
+    # Insert user
     cursor.execute("""
         INSERT INTO users
         (full_name, phone, vehicle_no, vehicle_type)
@@ -83,7 +84,7 @@ def book():
 
     user_id = cursor.lastrowid
 
-    # booking entry
+    # Insert booking
     cursor.execute("""
         INSERT INTO bookings
         (user_id, slot_id, booking_mode, booking_date,
@@ -94,7 +95,7 @@ def book():
         NOW(),NOW(),%s,%s,'Paid')
     """, (user_id, slot_id, hours, amount))
 
-    # occupy slot
+    # Update slot
     cursor.execute("""
         UPDATE parking_slots
         SET status='Occupied'
@@ -128,16 +129,10 @@ def reports():
 
     occupied = len(rows)
 
-    cursor.execute("""
-        SELECT COUNT(*) total
-        FROM parking_slots
-    """)
+    cursor.execute("SELECT COUNT(*) total FROM parking_slots")
     total = cursor.fetchone()
 
-    cursor.execute("""
-        SELECT COUNT(*) bookings
-        FROM bookings
-    """)
+    cursor.execute("SELECT COUNT(*) bookings FROM bookings")
     bookings = cursor.fetchone()
 
     return jsonify({
@@ -149,4 +144,4 @@ def reports():
 
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(host="0.0.0.0", port=5000)
