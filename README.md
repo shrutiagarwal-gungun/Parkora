@@ -1,7 +1,5 @@
 # PARKORA – Smart Parking Slot Booking System
 
-# PARKORA – Smart Parking Slot Booking System
-
 ## 🔗 Live Demo
 https://parkora.vercel.app
 
